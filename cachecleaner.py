@@ -73,7 +73,7 @@ def clean_cache(workdir, capacity, quiet=False):
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    parser = ArgumentParser(description='Keep dir size in given capacity.')
+    parser = ArgumentParser(description='Keeps dir size in given capacity.')
     parser.add_argument("capacity", type=float,
                         help="cache capacity, megabytes")
     parser.add_argument("workdir", help="where is cache dir")
