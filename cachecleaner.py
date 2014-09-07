@@ -6,6 +6,9 @@ from tqdm import tqdm
 from contextlib import contextmanager
 
 
+MEGABYTE = 2 ** 20
+
+
 @contextmanager
 def section(caption, quiet=False):
     if not quiet:
@@ -19,7 +22,7 @@ def section(caption, quiet=False):
         ))
 
 
-def listdir(workdir, quiet=False):
+def listdir(workdir, quiet=False, time_type='st_atime'):
     workdir = os.path.realpath(workdir) + os.sep
 
     with section('Reading files list', quiet):
@@ -36,20 +39,22 @@ def listdir(workdir, quiet=False):
                 stats = os.stat(workdir + f)
             except OSError:
                 continue
-            files_with_stats.append((stats.st_atime, stats.st_size, f))
+            files_with_stats.append(
+                (getattr(stats, time_type), stats.st_size, f)
+            )
 
     return files_with_stats
 
 
-def clean_cache(workdir, capacity, quiet=False):
+def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
     workdir = os.path.realpath(workdir) + os.sep
 
-    files = listdir(workdir, quiet)
+    files = listdir(workdir, quiet, time_type)
 
     total_size = sum(stats[1] for stats in files)
 
     if not quiet:
-        print('    total size: {:0.1f} mb'.format(total_size / 1024 /1024))
+        print('    total size: {:0.1f} mb'.format(total_size / MEGABYTE))
 
     if total_size <= capacity:
         if not quiet:
@@ -71,7 +76,7 @@ def clean_cache(workdir, capacity, quiet=False):
     else:
         print('    to delete: {} files, {:0.1f} mb'.format(
             len(files),
-            sum(stats[1] for stats in files) / 1024 / 1024,
+            sum(stats[1] for stats in files) / MEGABYTE,
         ))
         filesiter = tqdm(files, mininterval=.1)
 
@@ -85,16 +90,20 @@ def clean_cache(workdir, capacity, quiet=False):
     return files
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description='Keeps dir size in given capacity.')
-    parser.add_argument("capacity", type=float,
-                        help="cache capacity, megabytes")
-    parser.add_argument("workdir", help="where is cache dir")
-    parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
-                        default=False, help="do not output in console")
+    parser.add_argument('capacity', type=float,
+                        help='cache capacity, megabytes')
+    parser.add_argument('workdir', help='where is cache dir')
+    parser.add_argument('-t', '--type', choices=['atime', 'ctime', 'mtime'],
+                        dest='time_type', default='atime',
+                        help='time attribute type')
+    parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
+                        default=False, help='do not output in console')
 
     kwargs = vars(parser.parse_args())
-    kwargs['capacity'] *= 2 ** 20
+    kwargs['capacity'] *= MEGABYTE
+    kwargs['time_type'] = 'st_' + kwargs['time_type']
     clean_cache(**kwargs)
