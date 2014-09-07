@@ -32,7 +32,10 @@ def clean_cache(workdir, capacity, quiet=False):
     with section('Reading files stats', quiet):
         files_with_stats = []
         for f in files:
-            stats = os.stat(workdir + f)
+            try:
+                stats = os.stat(workdir + f)
+            except OSError:
+                continue
             files_with_stats.append((stats.st_atime, stats.st_size, f))
         del files
 
@@ -65,7 +68,10 @@ def clean_cache(workdir, capacity, quiet=False):
 
     with section('Deleting files', quiet):
         for _, _, f in files_with_stats:
-            os.remove(workdir + f)
+            try:
+                os.remove(workdir + f)
+            except OSError:
+                continue
 
     return files_with_stats
 
