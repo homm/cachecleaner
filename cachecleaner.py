@@ -19,7 +19,7 @@ def section(caption, quiet=False):
         ))
 
 
-def clean_cache(workdir, capacity, quiet=False):
+def listdir(workdir, quiet=False):
     workdir = os.path.realpath(workdir) + os.sep
 
     with section('Reading files list', quiet):
@@ -37,9 +37,16 @@ def clean_cache(workdir, capacity, quiet=False):
             except OSError:
                 continue
             files_with_stats.append((stats.st_atime, stats.st_size, f))
-        del files
 
-    total_size = sum(stats[1] for stats in files_with_stats)
+    return files_with_stats
+
+
+def clean_cache(workdir, capacity, quiet=False):
+    workdir = os.path.realpath(workdir) + os.sep
+
+    files = listdir(workdir, quiet)
+
+    total_size = sum(stats[1] for stats in files)
 
     if not quiet:
         print('    total size: {:0.1f} mb'.format(total_size / 1024 /1024))
@@ -50,30 +57,32 @@ def clean_cache(workdir, capacity, quiet=False):
         return []
 
     with section('Sorting files', quiet):
-        files_with_stats.sort(reverse=True)
+        files.sort(reverse=True)
 
         total_size = 0
-        for i, (_, size, _) in enumerate(files_with_stats):
+        for i, (_, size, _) in enumerate(files):
             total_size += size
             if total_size > capacity:
                 break
-        files_with_stats = files_with_stats[i:]
+        files = files[i:]
 
-    if not quiet:
+    if quiet:
+        filesiter = files
+    else:
         print('    to delete: {} files, {:0.1f} mb'.format(
-            len(files_with_stats),
-            sum(stats[1] for stats in files_with_stats) / 1024 / 1024,
+            len(files),
+            sum(stats[1] for stats in files) / 1024 / 1024,
         ))
-        files_with_stats = tqdm(files_with_stats, mininterval=.1)
+        filesiter = tqdm(files, mininterval=.1)
 
     with section('Deleting files', quiet):
-        for _, _, f in files_with_stats:
+        for _, _, f in filesiter:
             try:
                 os.remove(workdir + f)
             except OSError:
                 continue
 
-    return files_with_stats
+    return files
 
 
 if __name__ == "__main__":
