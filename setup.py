@@ -12,6 +12,6 @@ setup(
     url='https://github.com/homm/cachecleaner',
     py_modules=['cachecleaner'],
     install_requires=[
-        'tqdm',
+        'tqdm>=4.10.0',
     ]
 )
