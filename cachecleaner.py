@@ -24,6 +24,9 @@ def section(caption, quiet=False):
     write('took {:0.2f} sec'.format(time.time() - start))
     write('')
 
+def update_bar(bar, n):
+    bar.update(min(bar.total, n + bar.n) - bar.n)
+
 
 def listdir(workdir, quiet=False, time_type='st_atime'):
     workdir = os.path.realpath(workdir) + os.sep
@@ -60,31 +63,40 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
         return []
 
     with section('Sorting files', quiet) as write:
-        files.sort(reverse=True)
+        files.sort()
 
-        oldest = datetime.utcnow() - datetime.utcfromtimestamp(files[-1][0])
+        oldest = datetime.utcnow() - datetime.utcfromtimestamp(files[0][0])
         write('oldest file: {}'.format(oldest))
 
-        total_size = 0
-        for i, (_, size, _) in enumerate(files):
-            total_size += size
-            if total_size > capacity:
-                break
-        files = files[i:]
-
-        lifetime = datetime.utcnow() - datetime.utcfromtimestamp(files[0][0])
-        write('cache lifetime: {}'.format(lifetime))
-
     with section('Deleting files', quiet) as write:
-        for _, _, f in tqdm(files, disable=quiet, bar_format=BAR_FORMAT):
-            try:
-                os.remove(workdir + f)
-            except OSError:
-                continue
+        skipped = deleted = deleted_size = 0
+        with tqdm(total=total_size - capacity, disable=quiet,
+                  bar_format=BAR_FORMAT, unit='b',
+                  unit_scale=True, unit_divisor=1024) as bar:
+            for atime, size, fn in files:
+                fn = workdir + fn
+                if total_size - deleted_size <= capacity:
+                    break
+
+                try:
+                    stats = os.stat(fn)
+                    if getattr(stats, time_type) > atime:
+                        skipped += 1
+                        continue
+                    os.remove(fn)
+                except OSError:
+                    skipped += 1
+                    continue
+                update_bar(bar, size)
+                deleted_size += size
+                deleted += 1
+
+        oldest = datetime.utcnow() - datetime.utcfromtimestamp(atime)
+        write('oldest file: {}'.format(oldest))
         write('deleted: {} files, {:0.1f} mb'.format(
-            len(files),
-            sum(stats[1] for stats in files) / MEGABYTE,
+            deleted, deleted_size / MEGABYTE,
         ))
+        write('skipped: {} files'.format(skipped))
 
     return files
 
@@ -103,6 +115,6 @@ if __name__ == '__main__':
                         default=False, help='do not output in console')
 
     kwargs = vars(parser.parse_args())
-    kwargs['capacity'] *= MEGABYTE
+    kwargs['capacity'] = int(kwargs['capacity'] * MEGABYTE)
     kwargs['time_type'] = 'st_' + kwargs['time_type']
     clean_cache(**kwargs)
