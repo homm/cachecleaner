@@ -24,6 +24,7 @@ def section(caption, quiet=False):
     write('took {:0.2f} sec'.format(time.time() - start))
     write('')
 
+
 def update_bar(bar, n):
     bar.update(min(bar.total, n + bar.n) - bar.n)
 
@@ -73,25 +74,26 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
         with tqdm(total=total_size - capacity, disable=quiet,
                   bar_format=BAR_FORMAT, unit='b',
                   unit_scale=True, unit_divisor=1024) as bar:
-            for atime, size, fn in files:
-                fn = workdir + fn
+            for file_time, size, file_name in files:
                 if total_size - deleted_size <= capacity:
                     break
 
+                file_name = workdir + file_name
                 try:
-                    stats = os.stat(fn)
-                    if getattr(stats, time_type) > atime:
+                    stats = os.stat(file_name)
+                    if getattr(stats, time_type) > file_time:
                         skipped += 1
                         continue
-                    os.remove(fn)
+                    os.remove(file_name)
                 except OSError:
                     skipped += 1
                     continue
+
                 update_bar(bar, size)
                 deleted_size += size
                 deleted += 1
 
-        oldest = datetime.utcnow() - datetime.utcfromtimestamp(atime)
+        oldest = datetime.utcnow() - datetime.utcfromtimestamp(file_time)
         write('oldest file: {}'.format(oldest))
         write('deleted: {} files, {:0.1f} mb'.format(
             deleted, deleted_size / MEGABYTE,
