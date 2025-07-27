@@ -116,7 +116,7 @@ def clean_forever(sleep_for, kwargs):
         time.sleep(sleep_for)
 
 
-if __name__ == '__main__':
+def main():
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description='Keeps dir size in given capacity.')
@@ -143,3 +143,7 @@ if __name__ == '__main__':
         clean_cache(**kwargs)
     else:
         clean_forever(sleep_for, kwargs)
+
+
+if __name__ == '__main__':
+    main()
