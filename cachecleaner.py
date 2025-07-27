@@ -53,7 +53,7 @@ def listdir(workdir, quiet=False, time_type='st_atime'):
     return files_with_stats, total_size
 
 
-def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
+def clean_cache(workdir, capacity, quiet=False, time_type='st_atime', dry_run=False):
     workdir = os.path.realpath(workdir) + os.sep
 
     files, total_size = listdir(workdir, quiet, time_type)
@@ -84,7 +84,8 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
                     if getattr(stats, time_type) > file_time:
                         skipped += 1
                         continue
-                    os.remove(file_name)
+                    if not dry_run:
+                        os.remove(file_name)
                 except OSError:
                     skipped += 1
                     continue
@@ -115,6 +116,8 @@ if __name__ == '__main__':
                         help='time attribute type')
     parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                         default=False, help='do not output in console')
+    parser.add_argument('-d', '--dry-run', dest='dry_run', action='store_true',
+                        default=False, help='do not delete anything')
 
     kwargs = vars(parser.parse_args())
     kwargs['capacity'] = int(kwargs['capacity'] * MEGABYTE)
