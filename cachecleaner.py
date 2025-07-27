@@ -112,7 +112,7 @@ def clean_forever(sleep_for, kwargs):
 
         if not kwargs['quiet']:
             print(f'Sleep for {sleep_for} seconds')
-            print()
+            print(flush=True)
         time.sleep(sleep_for)
 
 
