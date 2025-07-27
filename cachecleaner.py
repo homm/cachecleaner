@@ -19,10 +19,9 @@ def section(caption, quiet=False):
 
     if not quiet:
         print(caption + '...')
-        start = time.time()
+    start = time.time()
     yield write
     write('took {:0.2f} sec'.format(time.time() - start))
-    write('')
 
 
 def update_bar(bar, n):
@@ -104,6 +103,19 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime', dry_run=Fa
     return files
 
 
+def clean_forever(sleep_for, kwargs):
+    while True:
+        try:
+            clean_cache(**kwargs)
+        except Exception as e:
+            print('Failed with exception:', e)
+
+        if not kwargs['quiet']:
+            print(f'Sleep for {sleep_for} seconds')
+            print()
+        time.sleep(sleep_for)
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
@@ -118,8 +130,16 @@ if __name__ == '__main__':
                         default=False, help='do not output in console')
     parser.add_argument('-d', '--dry-run', dest='dry_run', action='store_true',
                         default=False, help='do not delete anything')
+    parser.add_argument('-s', '--sleep', dest='sleep_for', type=float,
+                        default=None, help='run in endless mode with sleep '
+                        'seconds between runs')
 
     kwargs = vars(parser.parse_args())
     kwargs['capacity'] = int(kwargs['capacity'] * MEGABYTE)
     kwargs['time_type'] = 'st_' + kwargs['time_type']
-    clean_cache(**kwargs)
+
+    sleep_for = kwargs.pop('sleep_for')
+    if sleep_for is None:
+        clean_cache(**kwargs)
+    else:
+        clean_forever(sleep_for, kwargs)
