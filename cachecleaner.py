@@ -19,10 +19,9 @@ def section(caption, quiet=False):
 
     if not quiet:
         print(caption + '...')
-        start = time.time()
+    start = time.time()
     yield write
     write('took {:0.2f} sec'.format(time.time() - start))
-    write('')
 
 
 def update_bar(bar, n):
@@ -53,7 +52,7 @@ def listdir(workdir, quiet=False, time_type='st_atime'):
     return files_with_stats, total_size
 
 
-def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
+def clean_cache(workdir, capacity, quiet=False, time_type='st_atime', dry_run=False):
     workdir = os.path.realpath(workdir) + os.sep
 
     files, total_size = listdir(workdir, quiet, time_type)
@@ -84,7 +83,8 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
                     if getattr(stats, time_type) > file_time:
                         skipped += 1
                         continue
-                    os.remove(file_name)
+                    if not dry_run:
+                        os.remove(file_name)
                 except OSError:
                     skipped += 1
                     continue
@@ -103,6 +103,19 @@ def clean_cache(workdir, capacity, quiet=False, time_type='st_atime'):
     return files
 
 
+def clean_forever(sleep_for, kwargs):
+    while True:
+        try:
+            clean_cache(**kwargs)
+        except Exception as e:
+            print('Failed with exception:', e)
+
+        if not kwargs['quiet']:
+            print(f'Sleep for {sleep_for} seconds')
+            print()
+        time.sleep(sleep_for)
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
@@ -115,8 +128,18 @@ if __name__ == '__main__':
                         help='time attribute type')
     parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                         default=False, help='do not output in console')
+    parser.add_argument('-d', '--dry-run', dest='dry_run', action='store_true',
+                        default=False, help='do not delete anything')
+    parser.add_argument('-s', '--sleep', dest='sleep_for', type=float,
+                        default=None, help='run in endless mode with sleep '
+                        'seconds between runs')
 
     kwargs = vars(parser.parse_args())
     kwargs['capacity'] = int(kwargs['capacity'] * MEGABYTE)
     kwargs['time_type'] = 'st_' + kwargs['time_type']
-    clean_cache(**kwargs)
+
+    sleep_for = kwargs.pop('sleep_for')
+    if sleep_for is None:
+        clean_cache(**kwargs)
+    else:
+        clean_forever(sleep_for, kwargs)
