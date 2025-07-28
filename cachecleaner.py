@@ -1,44 +1,54 @@
-from __future__ import division, print_function
-
 import os
 import time
-from tqdm import tqdm
 from contextlib import contextmanager
 from datetime import datetime
 
+from tqdm import tqdm
 
 MEGABYTE = 2 ** 20
 BAR_FORMAT = '    {l_bar}{bar}{r_bar}'
 
 
 @contextmanager
-def section(caption, quiet=False):
+def section(caption, quiet=False, plain_out=False):
     def write(s):
-        if not quiet:
+        if quiet:
+            return
+        if plain_out:
+            out.append(s + ',')
+        else:
             print('    ' + s)
 
+    out = []
     if not quiet:
-        print(caption + '...')
+        if plain_out:
+            out.append(caption + '.')
+        else:
+            print(caption + '...')
+
     start = time.time()
     yield write
-    write('took {:0.2f} sec'.format(time.time() - start))
+    write(f'took {time.time() - start:0.2f} sec')
+
+    if plain_out:
+        print(" ".join(out))
 
 
 def update_bar(bar, n):
     bar.update(min(bar.total, n + bar.n) - bar.n)
 
 
-def listdir(workdir, quiet=False, time_type='st_atime'):
+def listdir(workdir, quiet=False, plain_out=False, time_type='st_atime'):
     workdir = os.path.realpath(workdir) + os.sep
 
-    with section('Reading files list', quiet) as write:
+    with section('Reading files list', quiet, plain_out) as write:
         files = os.listdir(workdir)
         write('total {} files in cache'.format(len(files)))
 
     files_with_stats = []
     total_size = 0
-    with section('Reading files stats', quiet) as write:
-        for f in tqdm(files, disable=quiet, bar_format=BAR_FORMAT):
+    with section('Reading files stats', quiet, plain_out) as write:
+        for f in tqdm(files, disable=plain_out, bar_format=BAR_FORMAT):
             try:
                 stats = os.stat(workdir + f)
             except OSError:
@@ -52,25 +62,31 @@ def listdir(workdir, quiet=False, time_type='st_atime'):
     return files_with_stats, total_size
 
 
-def clean_cache(workdir, capacity, quiet=False, time_type='st_atime', dry_run=False):
+def clean_cache(
+    workdir, capacity, quiet=False, time_type='st_atime', dry_run=False,
+    plain_out=False
+):
+    if quiet:
+        plain_out = True
+
     workdir = os.path.realpath(workdir) + os.sep
 
-    files, total_size = listdir(workdir, quiet, time_type)
+    files, total_size = listdir(workdir, quiet, plain_out, time_type)
 
     if total_size <= capacity:
         if not quiet:
             print('No files to delete!')
         return []
 
-    with section('Sorting files', quiet) as write:
+    with section('Sorting files', quiet, plain_out) as write:
         files.sort()
 
         oldest = datetime.utcnow() - datetime.utcfromtimestamp(files[0][0])
         write('oldest file: {}'.format(oldest))
 
-    with section('Deleting files', quiet) as write:
+    with section('Deleting files', quiet, plain_out) as write:
         skipped = deleted = deleted_size = 0
-        with tqdm(total=total_size - capacity, disable=quiet,
+        with tqdm(total=total_size - capacity, disable=plain_out,
                   bar_format=BAR_FORMAT, unit='b',
                   unit_scale=True, unit_divisor=1024) as bar:
             for file_time, size, file_name in files:
@@ -117,6 +133,7 @@ def clean_forever(sleep_for, kwargs):
 
 
 def main():
+    import sys
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description='Keeps dir size in given capacity.')
@@ -128,6 +145,9 @@ def main():
                         help='time attribute type')
     parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                         default=False, help='do not output in console')
+    parser.add_argument('-p', '--plain', dest='plain_out', action='store_true',
+                        default=not sys.stdout.isatty(),
+                        help='plain output (turned on if not TTY)')
     parser.add_argument('-d', '--dry-run', dest='dry_run', action='store_true',
                         default=False, help='do not delete anything')
     parser.add_argument('-s', '--sleep', dest='sleep_for', type=float,
