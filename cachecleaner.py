@@ -22,13 +22,14 @@ def section(caption, quiet=False, plain_out=False):
     out = []
     if not quiet:
         if plain_out:
-            out.append(caption + '.')
+            out.append(f"[{caption}]")
         else:
-            print(caption + '...')
+            print(f"{caption}...")
 
     start = time.time()
     yield write
-    write(f'took {time.time() - start:0.2f} sec')
+    took_ms = 1000 * (time.time() - start)
+    write(f'{took_ms:.0f}ms')
 
     if plain_out:
         print(" ".join(out))
@@ -41,13 +42,13 @@ def update_bar(bar, n):
 def listdir(workdir, quiet=False, plain_out=False, time_type='st_atime'):
     workdir = os.path.realpath(workdir) + os.sep
 
-    with section('Reading files list', quiet, plain_out) as write:
+    with section('Reading list', quiet, plain_out) as write:
         files = os.listdir(workdir)
-        write('total {} files in cache'.format(len(files)))
+        write(f'{len(files)} files')
 
     files_with_stats = []
     total_size = 0
-    with section('Reading files stats', quiet, plain_out) as write:
+    with section('Reading stats', quiet, plain_out) as write:
         for f in tqdm(files, disable=plain_out, bar_format=BAR_FORMAT):
             try:
                 stats = os.stat(workdir + f)
@@ -57,7 +58,7 @@ def listdir(workdir, quiet=False, plain_out=False, time_type='st_atime'):
             files_with_stats.append(
                 (getattr(stats, time_type), stats.st_size, f)
             )
-        write('total size: {:0.1f} mb'.format(total_size / MEGABYTE))
+        write(f'{total_size / MEGABYTE:0.1f} Mb')
 
     return files_with_stats, total_size
 
@@ -78,13 +79,13 @@ def clean_cache(
             print('No files to delete!')
         return []
 
-    with section('Sorting files', quiet, plain_out) as write:
+    with section('Sorting', quiet, plain_out) as write:
         files.sort()
 
         oldest = datetime.utcnow() - datetime.utcfromtimestamp(files[0][0])
-        write('oldest file: {}'.format(oldest))
+        write(f'oldest: {oldest}')
 
-    with section('Deleting files', quiet, plain_out) as write:
+    with section('Deleting', quiet, plain_out) as write:
         skipped = deleted = deleted_size = 0
         with tqdm(total=total_size - capacity, disable=plain_out,
                   bar_format=BAR_FORMAT, unit='b',
@@ -110,11 +111,9 @@ def clean_cache(
                 deleted += 1
 
         oldest = datetime.utcnow() - datetime.utcfromtimestamp(file_time)
-        write('oldest file: {}'.format(oldest))
-        write('deleted: {} files, {:0.1f} mb'.format(
-            deleted, deleted_size / MEGABYTE,
-        ))
-        write('skipped: {} files'.format(skipped))
+        write(f'deleted: {deleted} files, {deleted_size / MEGABYTE:0.1f} Mb')
+        write(f'oldest: {oldest}')
+        write(f'skipped: {skipped}')
 
     return files
 
